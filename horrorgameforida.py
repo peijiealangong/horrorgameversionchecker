@@ -1,7 +1,6 @@
-#Note: use pyinstaller --onefile horrorgameforida.py (in game folder) to convert this to exe!
-
 import pygame, sys, random, math, os
 from dataclasses import dataclass
+#pyinstaller --onefile --icon="icon.ico" horrorgameforida.py 
 
 # -------------------------------------------------------------------
 # INITIAL SETUP
@@ -35,21 +34,24 @@ BLUE = (60, 140, 240)
 PANEL = (28, 28, 34)
 
 PROGRESS_FILE = "progress.txt"
-GAME_VERSION = "v1.1.2.1"
+GAME_VERSION = "v1.1.4"
 
 # -------------------------------------------------------------------
 # UTILS
 # -------------------------------------------------------------------
 def draw_text(surf, text, pos, color=WHITE, font=FONT):
-    surf.blit(font.render(text, True, color), pos)
+    surf.blit(font.render(str(text), True, color), (int(pos[0]), int(pos[1])))
+
 
 def draw_centered_text(surf, text, rect, color=WHITE, font=FONT):
-    r = font.render(text, True, color)
+    r = font.render(str(text), True, color)
     surf.blit(r, (rect.x + (rect.width - r.get_width()) // 2,
                   rect.y + (rect.height - r.get_height()) // 2))
 
+
 def clamp(v, a, b):
     return max(a, min(b, v))
+
 
 # -------------------------------------------------------------------
 # BUTTON
@@ -79,6 +81,7 @@ class Button:
             event.button == 1 and
             self.rect.collidepoint(event.pos)
         )
+
 
 # -------------------------------------------------------------------
 # GAME ENTITIES
@@ -112,21 +115,21 @@ class Player:
         if self.inventory is None:
             self.inventory = []
         if self.ability_cd is None:
-            self.ability_cd = {"Q": 0.0, "W": 0.0, "E": 0.0}
+            self.ability_cd = {"Z": 0.0, "X": 0.0, "C": 0.0}
         if self.ability_max_cd is None:
-            self.ability_max_cd = {"Q": 5.0, "W": 8.0, "E": 12.0}
+            self.ability_max_cd = {"Z": 5.0, "X": 8.0, "C": 12.0}
         if self.ability_level is None:
-            self.ability_level = {"Q": 1, "W": 1, "E": 1}
+            self.ability_level = {"Z": 1, "X": 1, "C": 1}
 
     def move(self, vel, walls):
         new = self.pos + vel
-        rect = pygame.Rect(new.x - self.radius, new.y - self.radius,
+        rect = pygame.Rect(int(new.x - self.radius), int(new.y - self.radius),
                            self.radius * 2, self.radius * 2)
         for w in walls:
             if rect.colliderect(w):
-                rect_x = pygame.Rect(new.x - self.radius, self.pos.y - self.radius,
+                rect_x = pygame.Rect(int(new.x - self.radius), int(self.pos.y - self.radius),
                                      self.radius * 2, self.radius * 2)
-                rect_y = pygame.Rect(self.pos.x - self.radius, new.y - self.radius,
+                rect_y = pygame.Rect(int(self.pos.x - self.radius), int(new.y - self.radius),
                                      self.radius * 2, self.radius * 2)
                 if not rect_x.colliderect(w):
                     new.y = self.pos.y
@@ -147,7 +150,7 @@ class Player:
             return False
         lvl = self.ability_level.get(key, 1)
 
-        if key == "Q":
+        if key == "Z":
             dirv = pygame.Vector2(target_pos) - self.pos
             if dirv.length() > 0:
                 dash = dirv.normalize() * (160 + 20 * lvl)
@@ -156,14 +159,14 @@ class Player:
                 if (self.pos - c.pos).length() < 40 + 5 * lvl:
                     dmg = self.damage * (1 + 0.2 * lvl)
                     c.hp -= dmg
-                    damage_numbers.append(DamageNumber(c.pos.xy, dmg))
+                    damage_numbers.append(DamageNumber((int(c.pos.x), int(c.pos.y)), dmg))
             for b in bosses:
                 if b.alive and (self.pos - b.pos).length() < 60 + 5 * lvl:
                     dmg = self.damage * (1 + 0.2 * lvl)
                     b.hp -= dmg
-                    damage_numbers.append(DamageNumber(b.pos.xy, dmg))
+                    damage_numbers.append(DamageNumber((int(b.pos.x), int(b.pos.y)), dmg))
 
-        elif key == "W":
+        elif key == "X":
             for c in creeps:
                 d = c.pos - self.pos
                 if d.length() < 180:
@@ -174,23 +177,24 @@ class Player:
                     b.pos += (b.pos - self.pos).normalize() * (80 + 10 * lvl)
                     b.slow_timer = 1.5 + 0.2 * lvl
 
-        elif key == "E":
+        elif key == "C":
             for c in creeps:
                 d = c.pos - self.pos
                 if d.length() < 220:
                     dmg = self.damage * (1.5 + 0.1 * lvl)
                     c.hp -= dmg
                     self.hp = clamp(self.hp + dmg * 0.3, 0, self.max_hp)
-                    damage_numbers.append(DamageNumber(c.pos.xy, dmg))
+                    damage_numbers.append(DamageNumber((int(c.pos.x), int(c.pos.y)), dmg))
             for b in bosses:
                 if b.alive and (b.pos - self.pos).length() < 260:
                     dmg = self.damage * (1.5 + 0.1 * lvl)
                     b.hp -= dmg
                     self.hp = clamp(self.hp + dmg * 0.2, 0, self.max_hp)
-                    damage_numbers.append(DamageNumber(b.pos.xy, dmg))
+                    damage_numbers.append(DamageNumber((int(b.pos.x), int(b.pos.y)), dmg))
 
         self.ability_cd[key] = self.ability_max_cd[key]
         return True
+
 
 @dataclass
 class Creep:
@@ -211,6 +215,7 @@ class Creep:
         dirv = player.pos - self.pos
         if dirv.length_squared() > 0:
             self.pos += dirv.normalize() * sp * dt
+
 
 @dataclass
 class Boss:
@@ -256,6 +261,7 @@ class Boss:
         if self.hp <= 0:
             self.alive = False
 
+
 @dataclass
 class DamageNumber:
     pos: tuple
@@ -266,6 +272,7 @@ class DamageNumber:
     def update(self, dt):
         self.lifetime -= dt
         self.pos = (self.pos[0], self.pos[1] + self.vy * dt)
+
 
 @dataclass
 class ShopItem:
@@ -279,6 +286,8 @@ class ShopItem:
     def buy(self, player, persistent_gold, persistent_unlocked, persistent_inventory):
         if persistent_gold < self.cost:
             return False, persistent_gold
+        if self.permanent and self.name in persistent_unlocked:
+            return False, persistent_gold
         persistent_gold -= self.cost
         if self.permanent:
             persistent_unlocked.append(self.name)
@@ -288,23 +297,29 @@ class ShopItem:
             persistent_inventory.append(self.name)
         return True, persistent_gold
 
+
 # -------------------------------------------------------------------
 # SHOP EFFECTS
 # -------------------------------------------------------------------
 def health_potion_use(player):
     player.hp = clamp(player.hp + 150, 0, player.max_hp)
 
+
 def damage_talisman_buy(player):
     player.damage += 8
+
 
 def speed_boots_buy(player):
     player.base_speed += 0.8
 
+
 def battery_pack_use(player):
     player.battery = clamp(player.battery + 80, 0, 100)
 
+
 def food_ration_use(player):
     player.food = clamp(player.food + 40, 0, 100)
+
 
 SHOP_ITEMS = [
     ShopItem("Health Potion", 60, False, on_use=health_potion_use,
@@ -348,6 +363,7 @@ custom_settings = {"color": (255, 255, 255), "speed": 2.6}
 best_score = 0
 highest_level_unlocked = 1
 
+
 def load_progress():
     global best_score, highest_level_unlocked, persistent_gold
     global persistent_unlocked, persistent_inventory
@@ -367,7 +383,7 @@ def load_progress():
                     persistent_unlocked = lines[3].split(",") if lines[3] else []
                 if len(lines) >= 5:
                     persistent_inventory = lines[4].split(",") if lines[4] else []
-        except:
+        except Exception:
             pass
 
 
@@ -379,7 +395,7 @@ def save_progress():
             f.write(str(persistent_gold) + "\n")
             f.write(",".join(persistent_unlocked) + "\n")
             f.write(",".join(persistent_inventory) + "\n")
-    except:
+    except Exception:
         pass
 
 
@@ -394,6 +410,7 @@ def make_default_player(custom=None):
         p.color = custom.get("color", WHITE)
         p.base_speed = custom.get("speed", p.base_speed)
     return p
+
 
 player = make_default_player(custom_settings)
 player.gold = persistent_gold
@@ -412,6 +429,7 @@ score = 0
 run_time = 0.0
 
 difficulty = "Normal"  # "Easy", "Normal", "Hard"
+
 # -------------------------------------------------------------------
 # LEVEL / SPAWN SYSTEM
 # -------------------------------------------------------------------
@@ -421,6 +439,7 @@ def difficulty_modifiers():
     elif difficulty == "Hard":
         return 1.3, 1.3, 0.8
     return 1.0, 1.0, 1.0
+
 
 def spawn_initial_bosses_for_level(level):
     bosses.clear()
@@ -436,6 +455,7 @@ def spawn_initial_bosses_for_level(level):
         bosses.append(Boss(pygame.Vector2(x, y), hp=hp, max_hp=hp,
                            radius=r, speed=sp, kind=kind))
 
+
 def spawn_initial_pickups():
     pickups.clear()
     for _ in range(4):
@@ -449,6 +469,7 @@ def spawn_initial_pickups():
             'value': val
         })
 
+
 def drop_food_at(pos, value=30):
     pickups.append({
         'pos': pygame.Vector2(pos.x, pos.y),
@@ -456,8 +477,8 @@ def drop_food_at(pos, value=30):
         'value': value
     })
 
+
 def spawn_creep():
-    global spawn_interval
     hp_mod, _, spawn_mod = difficulty_modifiers()
     active = len(creeps) + sum(1 for b in bosses if b.alive)
     if active >= level_enemy_cap:
@@ -475,8 +496,10 @@ def spawn_creep():
     creeps.append(Creep(pos, hp=base_hp * hp_mod,
                         speed=0.8 + random.random() * 0.4))
 
+
 def all_bosses_dead():
     return len(bosses) > 0 and all(not b.alive for b in bosses)
+
 
 def setup_level(level):
     global level_enemy_cap, spawn_timer, current_level, run_time
@@ -489,6 +512,7 @@ def setup_level(level):
     spawn_timer = 0.0
     run_time = 0.0
 
+
 def reset_player_for_new_run():
     global player
     player = make_default_player(custom_settings)
@@ -500,12 +524,14 @@ def reset_player_for_new_run():
             player.base_speed += 0.8
     player.inventory = persistent_inventory.copy()
 
+
 def start_level(level):
     global score
     reset_player_for_new_run()
     if level == 1:
         score = 0
     setup_level(level)
+
 
 # -------------------------------------------------------------------
 # COMBAT / PICKUPS / INVENTORY
@@ -548,6 +574,7 @@ def handle_combat(dt):
     else:
         player.out_of_combat_timer += dt
 
+
 def pickup_check():
     for p in list(pickups):
         if (player.pos - p['pos']).length() < player.radius + 10 + 4:
@@ -565,6 +592,7 @@ def pickup_check():
                 player.food = clamp(player.food + p['value'], 0, 100)
             pickups.remove(p)
 
+
 def use_inventory_slot(slot):
     if 0 <= slot < len(player.inventory):
         name = player.inventory.pop(slot)
@@ -574,6 +602,7 @@ def use_inventory_slot(slot):
             battery_pack_use(player)
         elif name == "Food Ration":
             food_ration_use(player)
+
 
 # -------------------------------------------------------------------
 # HUD / DRAWING
@@ -600,39 +629,33 @@ def draw_minimap():
     screen.blit(mini, (WIDTH - w - 12, HEIGHT - h - 12))
     pygame.draw.rect(screen, GRAY, (WIDTH - w - 12, HEIGHT - h - 12, w, h), 2)
 
+
 def draw_hud():
-    # Top info / controls
     draw_text(screen, "Controls: WASD move  Shift sprint  Mouse aim  E pickup  F eat ration  1-4 use items  Q dashboard",
               (12, 8), LIGHT_GRAY)
     draw_text(screen, "Z/X/C abilities  T teleport  ESC pause", (12, 26), LIGHT_GRAY)
 
-    # Boss alert
     if any(b.alive for b in bosses):
         draw_text(screen, "⚠ Boss Active!", (WIDTH // 2 - 60, 8), ORANGE, MID)
 
-        # --- Stat bars with icons aligned to the left of each bar ---
-    # bar layout
     bar_x = 32
     bar_w = 360
-    icon_x = bar_x - 36   # icons sit 36px left of the bar
+    icon_x = bar_x - 36
     base_y = HEIGHT - 160
 
-    # HP row
     draw_heart(screen, icon_x + 12, base_y + 8, size=18)
     pygame.draw.rect(screen, (40, 40, 40), (bar_x, base_y, bar_w, 18))
     hpw = int(bar_w * (player.hp / player.max_hp))
     pygame.draw.rect(screen, RED, (bar_x, base_y, hpw, 18))
-    draw_text(screen, f"HP: {int(player.hp)}/{player.max_hp}", (bar_x + 4, base_y - 2))
+    draw_text(screen, f"HP: {int(player.hp)}/{int(player.max_hp)}", (bar_x + 4, base_y - 2))
 
-    # Battery row
     bat_y = base_y + 24
-    draw_battery(screen, icon_x + 2, bat_y + 1, w=36, h=12, pct=player.battery/100)
+    draw_battery(screen, icon_x + 2, bat_y + 1, w=36, h=12, pct=player.battery / 100)
     pygame.draw.rect(screen, (40, 40, 40), (bar_x, bat_y, bar_w, 14))
     bw = int(bar_w * (player.battery / 100))
     pygame.draw.rect(screen, YELLOW, (bar_x, bat_y, bw, 14))
     draw_text(screen, f"Battery: {int(player.battery)}%", (bar_x + 4, bat_y - 2))
 
-    # Stamina row
     stam_y = bat_y + 20
     draw_sprint_icon(screen, icon_x + 12, stam_y + 6)
     pygame.draw.rect(screen, (40, 40, 40), (bar_x, stam_y, bar_w, 12))
@@ -640,7 +663,6 @@ def draw_hud():
     pygame.draw.rect(screen, BLUE, (bar_x, stam_y, sw, 12))
     draw_text(screen, f"Stamina: {int(player.stamina)}", (bar_x + 4, stam_y - 2))
 
-    # Food row
     food_y = stam_y + 18
     draw_food_icon(screen, icon_x + 12, food_y + 6)
     pygame.draw.rect(screen, (40, 40, 40), (bar_x, food_y, bar_w, 12))
@@ -648,39 +670,11 @@ def draw_hud():
     pygame.draw.rect(screen, (200, 160, 60), (bar_x, food_y, fw, 12))
     draw_text(screen, f"Food: {int(player.food)}%", (bar_x + 4, food_y - 2))
 
-
-
-    # HP
-    pygame.draw.rect(screen, (40, 40, 40), (32, HEIGHT - 160, 360, 18))
-    hpw = int(360 * (player.hp / player.max_hp))
-    pygame.draw.rect(screen, RED, (32, HEIGHT - 160, hpw, 18))
-    draw_text(screen, f"HP: {int(player.hp)}/{player.max_hp}", (36, HEIGHT - 162))
-
-    # Battery
-    pygame.draw.rect(screen, (40, 40, 40), (32, HEIGHT - 136, 360, 14))
-    bw = int(360 * (player.battery / 100))
-    pygame.draw.rect(screen, YELLOW, (32, HEIGHT - 136, bw, 14))
-    draw_text(screen, f"Battery: {int(player.battery)}%", (36, HEIGHT - 138))
-
-    # Stamina
-    pygame.draw.rect(screen, (40, 40, 40), (32, HEIGHT - 116, 360, 12))
-    sw = int(360 * (player.stamina / 100))
-    pygame.draw.rect(screen, BLUE, (32, HEIGHT - 116, sw, 12))
-    draw_text(screen, f"Stamina: {int(player.stamina)}", (36, HEIGHT - 118))
-
-    # Food
-    pygame.draw.rect(screen, (40, 40, 40), (32, HEIGHT - 96, 360, 12))
-    fw = int(360 * (player.food / 100))
-    pygame.draw.rect(screen, (200, 160, 60), (32, HEIGHT - 96, fw, 12))
-    draw_text(screen, f"Food: {int(player.food)}%", (36, HEIGHT - 98))
-
-    # XP progress bar
     pygame.draw.rect(screen, (40, 40, 40), (420, HEIGHT - 180, 380, 10))
     xp_ratio = (player.xp % 100) / 100
     pygame.draw.rect(screen, BLUE, (420, HEIGHT - 180, int(380 * xp_ratio), 10))
     draw_text(screen, f"XP Progress: {int(xp_ratio * 100)}%", (420, HEIGHT - 192), LIGHT_GRAY)
 
-    # Stats
     draw_text(screen, f"Gold: {player.gold}", (420, HEIGHT - 160), YELLOW)
     draw_text(screen, f"XP: {player.xp}", (420, HEIGHT - 140), BLUE)
     draw_text(screen, f"Hero Level: {player.level}", (420, HEIGHT - 120), ORANGE)
@@ -689,11 +683,9 @@ def draw_hud():
     draw_text(screen, f"Difficulty: {difficulty}", (420, HEIGHT - 60), LIGHT_GRAY)
     draw_text(screen, f"Run Time: {run_time:.1f}s", (420, HEIGHT - 40), LIGHT_GRAY)
 
-    # Flashlight warning
     if player.battery < 20 and int(pygame.time.get_ticks() / 300) % 2 == 0:
         draw_text(screen, "LOW BATTERY!", (WIDTH // 2 - 60, HEIGHT - 200), YELLOW, MID)
 
-    # Inventory
     draw_text(screen, f"Teleport key: T (toggle inside/outside box)", (720, HEIGHT - 160), LIGHT_GRAY)
     draw_text(screen, "Inventory (1-4):", (720, HEIGHT - 140))
 
@@ -707,9 +699,8 @@ def draw_hud():
         else:
             draw_text(screen, f"{i + 1}: ---", (x + 6, HEIGHT - 116), LIGHT_GRAY)
 
-    # Ability cooldowns
     ax = 12
-    for k in ["Q", "W", "E"]:
+    for k in ["Z", "X", "C"]:
         rect = pygame.Rect(ax, HEIGHT - 220, 64, 32)
         pygame.draw.rect(screen, (30, 30, 40), rect)
         pygame.draw.rect(screen, GRAY, rect, 2)
@@ -721,7 +712,6 @@ def draw_hud():
             draw_text(screen, "Ready", (ax + 6, HEIGHT - 202), GREEN)
         ax += 80
 
-    # FPS counter
     fps = int(clock.get_fps())
     draw_text(screen, f"{fps} FPS", (WIDTH - 90, 10), LIGHT_GRAY)
 
@@ -741,24 +731,25 @@ def draw_world():
                                               else (ORANGE if kind == "gold" else BLUE))
         if kind == "food":
             col = (200, 160, 60)
-        pygame.draw.circle(screen, col, (int(p['pos'].x), int(p['pos'].y)), 10)
-        draw_text(screen, kind, (p['pos'].x - 12, p['pos'].y + 12), WHITE)
+        px, py = int(p['pos'].x), int(p['pos'].y)
+        pygame.draw.circle(screen, col, (px, py), 10)
+        draw_text(screen, kind, (px - 12, py + 12), WHITE)
 
     for c in creeps:
-        pygame.draw.circle(screen, RED, (int(c.pos.x), int(c.pos.y)), c.radius)
-        hpw = int(18 * (c.hp / 100))
-        pygame.draw.rect(screen, (30, 30, 30), (c.pos.x - 9, c.pos.y - 18, 18, 4))
-        pygame.draw.rect(screen, GREEN, (c.pos.x - 9, c.pos.y - 18, hpw, 4))
+        cx, cy = int(c.pos.x), int(c.pos.y)
+        pygame.draw.circle(screen, RED, (cx, cy), c.radius)
+        hpw = int(18 * max(0, c.hp) / 100)
+        pygame.draw.rect(screen, (30, 30, 30), (cx - 9, cy - 18, 18, 4))
+        pygame.draw.rect(screen, GREEN, (cx - 9, cy - 18, hpw, 4))
 
     for b in bosses:
         if b.alive:
+            bx, by = int(b.pos.x), int(b.pos.y)
             color = ORANGE if not b.enraged else (255, 80, 0)
-            pygame.draw.circle(screen, color, (int(b.pos.x), int(b.pos.y)), b.radius)
-            hpw = int(80 * (b.hp / b.max_hp))
-            pygame.draw.rect(screen, (30, 30, 30),
-                             (b.pos.x - 40, b.pos.y - b.radius - 14, 80, 8))
-            pygame.draw.rect(screen, RED,
-                             (b.pos.x - 40, b.pos.y - b.radius - 14, hpw, 8))
+            pygame.draw.circle(screen, color, (bx, by), b.radius)
+            hpw = int(80 * max(0, b.hp) / b.max_hp)
+            pygame.draw.rect(screen, (30, 30, 30), (bx - 40, by - b.radius - 14, 80, 8))
+            pygame.draw.rect(screen, RED, (bx - 40, by - b.radius - 14, hpw, 8))
 
     pygame.draw.circle(screen, player.color, (int(player.pos.x), int(player.pos.y)), player.radius)
 
@@ -773,10 +764,12 @@ def draw_world():
         alpha = int(255 * (dn.lifetime / 0.8))
         txt = FONT.render(str(int(dn.amount)), True, (255, 255, 255))
         txt.set_alpha(alpha)
-        screen.blit(txt, (dn.pos[0], dn.pos[1]))
+        screen.blit(txt, (int(dn.pos[0]), int(dn.pos[1])))
 
     draw_hud()
     draw_minimap()
+
+
 def wrap_text(text, font, max_width):
     words = text.split(" ")
     lines = []
@@ -793,41 +786,42 @@ def wrap_text(text, font, max_width):
         lines.append(cur)
     return lines
 
+
 def draw_text_block(surf, text, pos, max_width, color=WHITE, font=FONT, line_spacing=4):
     lines = wrap_text(text, font, max_width)
     x, y = pos
     for i, line in enumerate(lines):
         surf.blit(font.render(line, True, color), (x, y + i * (font.get_height() + line_spacing)))
     return y + len(lines) * (font.get_height() + line_spacing)
-# --- Icon helpers (put near your other utility functions) ---
+
+
 def draw_heart(surf, x, y, size=16, color=RED):
-    # simple heart made from two circles and a triangle
     r = size // 3
-    pygame.draw.circle(surf, color, (x - r, y), r)
-    pygame.draw.circle(surf, color, (x + r, y), r)
-    points = [(x - size//2, y), (x + size//2, y), (x, y + size//2)]
+    pygame.draw.circle(surf, color, (int(x - r), int(y)), r)
+    pygame.draw.circle(surf, color, (int(x + r), int(y)), r)
+    points = [(x - size // 2, y), (x + size // 2, y), (x, y + size // 2)]
     pygame.draw.polygon(surf, color, points)
 
-def draw_battery(surf, x, y, w=36, h=14, pct=1.0, color=YELLOW, bg=(40,40,40)):
-    pygame.draw.rect(surf, bg, (x, y, w, h))
+
+def draw_battery(surf, x, y, w=36, h=14, pct=1.0, color=YELLOW, bg=(40, 40, 40)):
+    pygame.draw.rect(surf, bg, (int(x), int(y), int(w), int(h)))
     inner_w = max(2, int((w - 4) * clamp(pct, 0.0, 1.0)))
-    pygame.draw.rect(surf, color, (x + 2, y + 2, inner_w, h - 4))
-    # terminal
-    pygame.draw.rect(surf, bg, (x + w, y + h//4, 4, h//2))
+    pygame.draw.rect(surf, color, (int(x + 2), int(y + 2), inner_w, int(h - 4)))
+    pygame.draw.rect(surf, bg, (int(x + w), int(y + h // 4), 4, int(h // 2)))
+
 
 def draw_sprint_icon(surf, x, y, size=14, color=BLUE):
-    # small running arrow
-    points = [(x - size//2, y + size//2), (x + size//2, y), (x - size//2, y - size//2)]
+    points = [(x - size // 2, y + size // 2), (x + size // 2, y), (x - size // 2, y - size // 2)]
     pygame.draw.polygon(surf, color, points)
 
-def draw_food_icon(surf, x, y, size=14, color=(200,160,60)):
-    # simple drumstick shape
-    pygame.draw.circle(surf, color, (x - size//4, y), size//3)
-    pygame.draw.rect(surf, color, (x - size//4, y - size//6, size//1, size//3))
+
+def draw_food_icon(surf, x, y, size=14, color=(200, 160, 60)):
+    pygame.draw.circle(surf, color, (int(x - size // 4), int(y)), size // 3)
+    pygame.draw.rect(surf, color, (int(x - size // 4), int(y - size // 6), int(size), int(size // 3)))
 
 
 # -------------------------------------------------------------------
-# DASHBOARD / SHOP / CUSTOMIZE / RESULTS / CHANGELOG / PAUSE
+# DASHBOARD / SHOP / CUSTOMIZE / RESULTS / PAUSE
 # -------------------------------------------------------------------
 btn_start = Button(pygame.Rect(80, 140, 260, 64), "Quick Start (Level 1)")
 btn_shop = Button(pygame.Rect(80, 220, 260, 64), "Shop")
@@ -845,10 +839,7 @@ shop_buttons = [Button(pygame.Rect(380, 120 + i * 84, 520, 64),
 
 color_presets = [(255, 255, 255), (200, 200, 255), (255, 200, 200),
                  (200, 255, 200), (255, 240, 120)]
-preset_buttons = [
-    Button(pygame.Rect(380 + i * 84, 120, 72, 72), "")
-    for i in range(len(color_presets))
-]
+preset_buttons = [Button(pygame.Rect(380 + i * 84, 120, 72, 72), "") for i in range(len(color_presets))]
 speed_minus = Button(pygame.Rect(380, 220, 56, 40), "-")
 speed_plus = Button(pygame.Rect(448, 220, 56, 40), "+")
 apply_custom = Button(pygame.Rect(380, 300, 160, 48), "Apply")
@@ -860,16 +851,12 @@ RESULT_DASH = Button(pygame.Rect(WIDTH // 2 + 100, HEIGHT // 2 + 60, 160, 50), "
 LEVEL_BUTTON_AREA = pygame.Rect(720, 140, 360, 420)
 LEVEL_BUTTON_HEIGHT = 40
 level_scroll_offset = 0
-
-# place arrows to the left of the level panel for clear association
 btn_scroll_up = Button(pygame.Rect(LEVEL_BUTTON_AREA.x - 48, LEVEL_BUTTON_AREA.y + 8, 40, 40), "▲")
 btn_scroll_down = Button(pygame.Rect(LEVEL_BUTTON_AREA.x - 48, LEVEL_BUTTON_AREA.y + LEVEL_BUTTON_AREA.height - 48, 40, 40), "▼")
 
 
 def draw_dashboard():
     screen.fill(DARK)
-
-    # Layout variables (tweak these to change spacing)
     left_x = 80
     left_w = 320
     left_y = 40
@@ -879,18 +866,15 @@ def draw_dashboard():
     right_w = WIDTH - right_x - 80
     right_y = 40
 
-    # Header
     draw_text(screen, "Welcome to Horror Arena!", (left_x, left_y), WHITE, BIG)
     draw_text(screen, f"{GAME_VERSION} — Made with Microsoft Copilot", (left_x, left_y + 40), LIGHT_GRAY)
 
-    # Buttons column (stacked)
     btn_y = left_y + 96
     for b in (btn_start, btn_shop, btn_customize, btn_changelog, btn_quit):
         b.rect.topleft = (left_x, btn_y)
         b.draw(screen)
         btn_y += b.rect.height + left_gap
 
-    # Instructions block (right of buttons)
     instr_x = right_x
     instr_y = right_y + 40
     draw_text(screen, "Instructions:", (instr_x, instr_y), WHITE, MID)
@@ -906,7 +890,6 @@ def draw_dashboard():
     for line in instr_lines:
         cur_y = draw_text_block(screen, "• " + line, (instr_x + 8, cur_y), right_w - 16, LIGHT_GRAY, FONT, line_spacing=2) + 6
 
-    # Stats block (below instructions)
     stats_x = right_x
     stats_y = cur_y + 12
     draw_text(screen, f"Gold: {persistent_gold}", (stats_x, stats_y), YELLOW)
@@ -914,7 +897,6 @@ def draw_dashboard():
     draw_text(screen, f"Highest Level Unlocked: {highest_level_unlocked}", (stats_x, stats_y + 52), LIGHT_GRAY)
     draw_text(screen, f"Saved Gold: {persistent_gold}", (stats_x, stats_y + 78), YELLOW)
 
-    # Difficulty area (below stats)
     diff_y = stats_y + 110
     draw_text(screen, "Difficulty:", (stats_x, diff_y), WHITE)
     btn_easy.rect.topleft = (stats_x + 100, diff_y - 6)
@@ -923,7 +905,6 @@ def draw_dashboard():
     btn_easy.draw(screen); btn_normal.draw(screen); btn_hard.draw(screen)
     draw_text(screen, f"Current: {difficulty}", (stats_x, diff_y + 130), LIGHT_GRAY)
 
-    # Level select area (rightmost)
     pygame.draw.rect(screen, (25, 25, 30), LEVEL_BUTTON_AREA)
     pygame.draw.rect(screen, GRAY, LEVEL_BUTTON_AREA, 2)
     draw_text(screen, "Level Select", (LEVEL_BUTTON_AREA.x + 8, LEVEL_BUTTON_AREA.y - 24), WHITE)
@@ -933,21 +914,18 @@ def draw_dashboard():
     for i in range(visible_slots):
         lvl = start_level_val + i
         y = LEVEL_BUTTON_AREA.y + i * LEVEL_BUTTON_HEIGHT
-        rect = pygame.Rect(LEVEL_BUTTON_AREA.x + 4, y + 2,
-                           LEVEL_BUTTON_AREA.width - 8, LEVEL_BUTTON_HEIGHT - 4)
+        rect = pygame.Rect(LEVEL_BUTTON_AREA.x + 4, y + 2, LEVEL_BUTTON_AREA.width - 8, LEVEL_BUTTON_HEIGHT - 4)
         unlocked = lvl <= highest_level_unlocked
         label = f"Level {lvl}" + (" (locked)" if not unlocked else "")
         btn = Button(rect, label, enabled=unlocked)
         btn.draw(screen)
 
-    # draw arrows next to level panel
     btn_scroll_up.draw(screen)
     btn_scroll_down.draw(screen)
 
-
-    # Footer hint (wrapped)
     footer_text = "Buy Food Rations in Shop. Press F in-game to eat a ration from inventory. Q in-game returns here. Scroll level list with mouse wheel or arrows."
     draw_text_block(screen, footer_text, (left_x, HEIGHT - 80), WIDTH - 160, LIGHT_GRAY, FONT, line_spacing=2)
+
 
 def draw_shop():
     screen.fill(DARK)
@@ -957,9 +935,9 @@ def draw_shop():
         b.draw(screen)
         it = SHOP_ITEMS[i]
         draw_text(screen, it.description, (b.rect.x + 8, b.rect.y + 36), LIGHT_GRAY)
-    draw_text(screen, "Click an item to buy. Permanent items apply immediately. Consumables go to inventory.",
-              (80, 520), LIGHT_GRAY)
+    draw_text(screen, "Click an item to buy. Permanent items apply immediately. Consumables go to inventory.", (80, 520), LIGHT_GRAY)
     draw_text(screen, "Back: press ESC", (80, 540), LIGHT_GRAY)
+
 
 def draw_customize(current_speed):
     screen.fill(DARK)
@@ -974,40 +952,36 @@ def draw_customize(current_speed):
     apply_custom.draw(screen)
     draw_text(screen, "Back: press ESC", (80, 520), LIGHT_GRAY)
 
+
 def draw_results(success, level, final_score, final_time):
     screen.fill(DARK)
     title = "LEVEL CLEARED" if success else "YOU DIED"
     color = GREEN if success else RED
-    draw_centered_text(screen, title,
-                       pygame.Rect(0, HEIGHT // 2 - 140, WIDTH, 60),
-                       color, BIG)
+    draw_centered_text(screen, title, pygame.Rect(0, HEIGHT // 2 - 140, WIDTH, 60), color, BIG)
     draw_centered_text(screen, f"Level: {level}   Score: {final_score}   Time: {final_time:.1f}s",
-                       pygame.Rect(0, HEIGHT // 2 - 80, WIDTH, 40),
-                       WHITE, MID)
-    draw_centered_text(screen, f"Best Score: {best_score}",
-                       pygame.Rect(0, HEIGHT // 2 - 40, WIDTH, 40),
-                       ORANGE, MID)
+                       pygame.Rect(0, HEIGHT // 2 - 80, WIDTH, 40), WHITE, MID)
+    draw_centered_text(screen, f"Best Score: {best_score}", pygame.Rect(0, HEIGHT // 2 - 40, WIDTH, 40), ORANGE, MID)
 
     RESULT_CONTINUE.draw(screen)
     RESULT_REPLAY.draw(screen)
     RESULT_DASH.draw(screen)
 
+
 def draw_pause():
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 180))
     screen.blit(overlay, (0, 0))
-    draw_centered_text(screen, "PAUSED",
-                       pygame.Rect(0, HEIGHT // 2 - 60, WIDTH, 40),
-                       WHITE, BIG)
-    draw_centered_text(screen, "ESC resume   Q dashboard",
-                       pygame.Rect(0, HEIGHT // 2, WIDTH, 40),
-                       LIGHT_GRAY, MID)
+    draw_centered_text(screen, "PAUSED", pygame.Rect(0, HEIGHT // 2 - 60, WIDTH, 40), WHITE, BIG)
+    draw_centered_text(screen, "ESC resume   Q dashboard", pygame.Rect(0, HEIGHT // 2, WIDTH, 40), LIGHT_GRAY, MID)
+
 
 def draw_changelog():
     screen.fill(DARK)
     draw_text(screen, "Changelog", (80, 80), WHITE, BIG)
 
     changelog_entries = [
+        "v1.1.4 — Fixed ability keys, save handling, and HUD cleanup",
+        "v1.1.3 — Fixed ability key bugs; BUG FIX",
         "v1.1.2.1 — Added start-screen instructions, gold & purchase saving",
         "v1.1.2 — HUD enhancements, warnings, XP bar, bug fixes",
         "v1.1.1 — Added changelog screen, welcome message, version watermark",
@@ -1052,7 +1026,6 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-        # DASHBOARD INPUT
         if state == STATE_DASHBOARD:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if btn_start.clicked(event):
@@ -1083,21 +1056,18 @@ while running:
                         start_level(lvl)
                         state = STATE_PLAYING
 
-                # arrow button clicks
                 if btn_scroll_up.clicked(event):
                     level_scroll_offset = max(0, level_scroll_offset - 1)
                 if btn_scroll_down.clicked(event):
                     max_scroll = max(0, highest_level_unlocked - (LEVEL_BUTTON_AREA.height // LEVEL_BUTTON_HEIGHT))
                     level_scroll_offset = min(level_scroll_offset + 1, max_scroll)
 
-            # keyboard arrows while on dashboard
             if event.type == pygame.KEYDOWN:
-                if state == STATE_DASHBOARD:
-                    if event.key == pygame.K_UP:
-                        level_scroll_offset = max(0, level_scroll_offset - 1)
-                    elif event.key == pygame.K_DOWN:
-                        max_scroll = max(0, highest_level_unlocked - (LEVEL_BUTTON_AREA.height // LEVEL_BUTTON_HEIGHT))
-                        level_scroll_offset = min(level_scroll_offset + 1, max_scroll)
+                if event.key == pygame.K_UP:
+                    level_scroll_offset = max(0, level_scroll_offset - 1)
+                elif event.key == pygame.K_DOWN:
+                    max_scroll = max(0, highest_level_unlocked - (LEVEL_BUTTON_AREA.height // LEVEL_BUTTON_HEIGHT))
+                    level_scroll_offset = min(level_scroll_offset + 1, max_scroll)
 
             if event.type == pygame.MOUSEWHEEL:
                 visible_slots = LEVEL_BUTTON_AREA.height // LEVEL_BUTTON_HEIGHT
@@ -1105,7 +1075,6 @@ while running:
                 level_scroll_offset -= event.y
                 level_scroll_offset = clamp(level_scroll_offset, 0, max_scroll)
 
-        # SHOP INPUT
         elif state == STATE_SHOP:
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 state = STATE_DASHBOARD
@@ -1113,10 +1082,8 @@ while running:
                 if b.clicked(event):
                     item = SHOP_ITEMS[i]
                     dummy_player = make_default_player(custom_settings)
-                    ok, persistent_gold = item.buy(dummy_player, persistent_gold,
-                                                   persistent_unlocked, persistent_inventory)
+                    ok, persistent_gold = item.buy(dummy_player, persistent_gold, persistent_unlocked, persistent_inventory)
 
-        # CUSTOMIZE INPUT
         elif state == STATE_CUSTOMIZE:
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 state = STATE_DASHBOARD
@@ -1131,29 +1098,18 @@ while running:
                 custom_settings["speed"] = custom_speed
                 state = STATE_DASHBOARD
 
-        # CHANGELOG INPUT
         elif state == STATE_CHANGELOG:
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 state = STATE_DASHBOARD
 
-        # GAMEPLAY INPUT
         elif state == STATE_PLAYING:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_q:
-                    # Save gold and inventory
                     persistent_gold = player.gold
                     persistent_inventory = player.inventory.copy()
-                    persistent_unlocked = persistent_unlocked  # stays the same
-
-                    # Save progress to file
-                    save_progress()
-
-                    # Update best score if needed
                     if score > best_score:
                         best_score = score
-                        save_progress()
-
-                    # Return to dashboard
+                    save_progress()
                     state = STATE_DASHBOARD
 
                 elif event.key == pygame.K_ESCAPE:
@@ -1172,11 +1128,11 @@ while running:
                     else:
                         player.pos = pygame.Vector2(TELEPORT_BOX.centerx, TELEPORT_BOX.centery)
                 elif event.key == pygame.K_z:
-                    player.cast_ability("X", pygame.mouse.get_pos(), creeps, bosses, damage_numbers)
+                    player.cast_ability("Z", pygame.mouse.get_pos(), creeps, bosses, damage_numbers)
                 elif event.key == pygame.K_x:
-                    player.cast_ability("C", pygame.mouse.get_pos(), creeps, bosses, damage_numbers)
+                    player.cast_ability("X", pygame.mouse.get_pos(), creeps, bosses, damage_numbers)
                 elif event.key == pygame.K_c:
-                    player.cast_ability("E", pygame.mouse.get_pos(), creeps, bosses, damage_numbers)
+                    player.cast_ability("C", pygame.mouse.get_pos(), creeps, bosses, damage_numbers)
                 elif event.key == pygame.K_e:
                     pickup_check()
                 elif event.key == pygame.K_f:
@@ -1184,26 +1140,35 @@ while running:
                         idx = player.inventory.index("Food Ration")
                         use_inventory_slot(idx)
 
-        # RESULTS INPUT
         elif state == STATE_RESULTS:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if RESULT_CONTINUE.clicked(event):
                     if results_success:
+                        persistent_gold = player.gold
+                        persistent_inventory = player.inventory.copy()
                         next_level = results_level + 1
                         if next_level > highest_level_unlocked:
                             highest_level_unlocked = next_level
-                            save_progress()
+                        save_progress()
                         start_level(next_level)
                         state = STATE_PLAYING
                     else:
+                        persistent_gold = player.gold
+                        persistent_inventory = player.inventory.copy()
+                        save_progress()
                         state = STATE_DASHBOARD
                 if RESULT_REPLAY.clicked(event):
+                    persistent_gold = player.gold
+                    persistent_inventory = player.inventory.copy()
+                    save_progress()
                     start_level(results_level)
                     state = STATE_PLAYING
                 if RESULT_DASH.clicked(event):
+                    persistent_gold = player.gold
+                    persistent_inventory = player.inventory.copy()
+                    save_progress()
                     state = STATE_DASHBOARD
 
-        # PAUSE INPUT
         elif state == STATE_PAUSE:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -1213,10 +1178,9 @@ while running:
                     persistent_inventory = player.inventory.copy()
                     if score > best_score:
                         best_score = score
-                        save_progress()
+                    save_progress()
                     state = STATE_DASHBOARD
 
-    # UPDATE GAMEPLAY
     if state == STATE_PLAYING:
         run_time += dt
 
@@ -1271,29 +1235,31 @@ while running:
                 damage_numbers.remove(dn)
 
         if player.hp <= 0:
+            persistent_gold = player.gold
+            persistent_inventory = player.inventory.copy()
             results_level = current_level
             results_success = False
             results_score = score
             results_time = run_time
             if score > best_score:
                 best_score = score
-                save_progress()
+            save_progress()
             state = STATE_RESULTS
 
         if all_bosses_dead():
+            persistent_gold = player.gold
+            persistent_inventory = player.inventory.copy()
             results_level = current_level
             results_success = True
             results_score = score
             results_time = run_time
             if current_level + 1 > highest_level_unlocked:
                 highest_level_unlocked = current_level + 1
-                save_progress()
             if score > best_score:
                 best_score = score
-                save_progress()
+            save_progress()
             state = STATE_RESULTS
 
-    # DRAW
     if state == STATE_DASHBOARD:
         draw_dashboard()
     elif state == STATE_SHOP:
@@ -1311,8 +1277,8 @@ while running:
         draw_changelog()
 
     draw_text(screen, GAME_VERSION, (WIDTH - 60, HEIGHT - 30), LIGHT_GRAY)
-
     pygame.display.flip()
 
 pygame.quit()
 sys.exit()
+
